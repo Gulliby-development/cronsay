@@ -9,6 +9,42 @@ function parsed(expression: string): ParsedCron {
 }
 
 describe("parseCron valid expressions", () => {
+  test.each([
+    ["@yearly", "0 0 1 1 *"],
+    ["@annually", "0 0 1 1 *"],
+    ["@monthly", "0 0 1 * *"],
+    ["@weekly", "0 0 * * 0"],
+    ["@daily", "0 0 * * *"],
+    ["@midnight", "0 0 * * *"],
+    ["@hourly", "0 * * * *"],
+  ])("expands %s like its five-field expression", (macro, expansion) => {
+    const result = parseCron(macro);
+    const expanded = parseCron(expansion);
+    expect(result.ok).toBe(true);
+    expect(expanded.ok).toBe(true);
+    if (!result.ok || !expanded.ok) throw new Error("Expected valid cron expressions");
+    expect(result.fields).toMatchObject({ ...expanded.fields, macro });
+    expect(result.fields.expression).toBe(expansion);
+  });
+
+  test.each([
+    ["@DAILY", "@daily", "0 0 * * *"],
+    ["@Hourly", "@hourly", "0 * * * *"],
+    [" \t@DaIlY\r\n", "@daily", "0 0 * * *"],
+  ])("normalizes macro token %s", (expression, macro, expansion) => {
+    const result = parseCron(expression);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.fields.macro).toBe(macro);
+    expect(result.fields.expression).toBe(expansion);
+  });
+
+  test("does not add macro metadata to plain expressions", () => {
+    const result = parseCron("0 0 * * *");
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.fields).not.toHaveProperty("macro");
+  });
   test("expands steps, ranges, lists, and case-insensitive names together", () => {
     const fields = parsed("*/15 0-6 1,15 JAN-MAR mon-fri");
     expect(fields.minutes).toEqual([0, 15, 30, 45]);
@@ -100,7 +136,7 @@ const invalidCases: InvalidCase[] = [
   ["* * * *", "field count"],
   ["* * * * * *", "field count"],
   ["* * * * * * *", "field count"],
-  ["@daily", "field count"],
+  ["@reboot", "field count"],
   ["@daily * * * *", "field count"],
   ["60 * * * *", "minute"],
   ["-1 * * * *", "minute"],
@@ -141,7 +177,24 @@ const invalidCases: InvalidCase[] = [
   ["H * * * *", "minute"],
 ];
 
+const fieldCountError =
+  "field count: expected five fields (minute hour day-of-month month day-of-week) or one macro (@yearly, @annually, @monthly, @weekly, @daily, @midnight, @hourly); other @-macros such as @reboot are unsupported";
+
 describe("parseCron invalid expressions", () => {
+  test.each([
+    "",
+    "   ",
+    "* * * *",
+    "* * * * * *",
+    "* * * * * * *",
+    "@reboot",
+    "@foo",
+    "@",
+    "@daily * * * *",
+  ])("%s returns the standard field-count message", (expression) => {
+    const result = parseCron(expression);
+    expect(result).toEqual({ ok: false, field: "field count", error: fieldCountError });
+  });
   test.each(invalidCases)("%s reports %s without throwing", (expression, field) => {
     expect(() => parseCron(expression)).not.toThrow();
     const result = parseCron(expression);
@@ -160,7 +213,7 @@ describe("parseCron invalid expressions", () => {
     ["1,,2 * * * *", /empty list item/i],
     ["* * * FOO *", /unknown/i],
     ["0 0 L * *", /unsupported/i],
-    ["@daily", /unsupported/i],
+    ["@reboot", /unsupported/i],
   ] as const)("%s explains the validation problem", (expression, problem) => {
     const result = parseCron(expression);
     expect(result.ok).toBe(false);

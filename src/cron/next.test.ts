@@ -44,6 +44,19 @@ describe("nextRuns", () => {
     );
   });
 
+  test("returns the next local hourly runs for @hourly", () => {
+    const start = new Date(2026, 2, 10, 10, 30, 0);
+    const runs = nextRuns(parsed("@hourly"), start);
+
+    expect(runs).toHaveLength(10);
+    expect(runs.slice(0, 3).map(localParts)).toEqual([
+      [2026, 3, 10, 11, 0],
+      [2026, 3, 10, 12, 0],
+      [2026, 3, 10, 13, 0],
+    ]);
+    expectFutureAscending(runs, start);
+  });
+
   test("does not include an exact start time or return a past minute", () => {
     const fields = parsed("*/15 * * * *");
     const start = new Date(2024, 0, 1, 0, 15, 30, 500);

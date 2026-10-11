@@ -137,6 +137,20 @@ describe("App rendered interactions", () => {
     }
   });
 
+  test("shows a macro expansion note only for valid macro expressions", () => {
+    let tree = App({ initialExpression: "@daily" });
+    const note = find(tree, (element) => element.props.id === "macro-note");
+    expect(note.type).toBe("p");
+    expect(note.props.className).toBe("hint");
+    expect(note.props.children).toBe("@daily means 0 0 * * *");
+
+    tree = typeExpression(tree, "0 0 * * *");
+    expect(elements(tree).filter((element) => element.props.id === "macro-note")).toHaveLength(0);
+
+    tree = typeExpression(tree, "@reboot");
+    expect(elements(tree).filter((element) => element.props.id === "macro-note")).toHaveLength(0);
+  });
+
   test("each rendered preset button fills the input and displays that schedule", () => {
     let tree = App({ initialExpression: "61 * * * *" });
     expect(presets.length).toBeGreaterThanOrEqual(5);
