@@ -1,6 +1,7 @@
 /** Parsed values are sorted and unique; Sunday is always represented by 0. */
 export interface ParsedCron {
   expression: string;
+  macro?: string;
   minutes: number[];
   hours: number[];
   daysOfMonth: number[];
@@ -114,16 +115,35 @@ function parseField(source: string, spec: FieldSpec): FieldResult {
   return { ok: true, values: [...values].sort((a, b) => a - b) };
 }
 
-/** Parse standard five-field cron. Invalid strings return an error, never throw. */
+const macroExpansions: Readonly<Record<string, string>> = {
+  "@yearly": "0 0 1 1 *",
+  "@annually": "0 0 1 1 *",
+  "@monthly": "0 0 1 * *",
+  "@weekly": "0 0 * * 0",
+  "@daily": "0 0 * * *",
+  "@midnight": "0 0 * * *",
+  "@hourly": "0 * * * *",
+};
+
+const fieldCountError =
+  "field count: expected five fields (minute hour day-of-month month day-of-week) or one macro (@yearly, @annually, @monthly, @weekly, @daily, @midnight, @hourly); other @-macros such as @reboot are unsupported";
+
+/** Parse standard five-field cron and supported macros. Invalid strings return an error, never throw. */
 export function parseCron(expression: string): ParseResult {
-  const tokens = expression.trim().split(/\s+/);
+  const trimmed = expression.trim();
+  const tokens = trimmed.split(/\s+/);
+  if (tokens.length === 1 && tokens[0].startsWith("@")) {
+    const macro = tokens[0].toLowerCase();
+    const expansion = macroExpansions[macro];
+    if (expansion === undefined) {
+      return { ok: false, field: "field count", error: fieldCountError };
+    }
+    const parsed = parseCron(expansion);
+    if (!parsed.ok) return parsed;
+    return { ok: true, fields: { ...parsed.fields, macro } };
+  }
   if (tokens.length !== 5 || tokens[0].startsWith("@")) {
-    return {
-      ok: false,
-      field: "field count",
-      error:
-        "field count: expected five fields (minute hour day-of-month month day-of-week); @-macros are unsupported",
-    };
+    return { ok: false, field: "field count", error: fieldCountError };
   }
   const fields: number[][] = [];
   for (let index = 0; index < fieldSpecs.length; index++) {

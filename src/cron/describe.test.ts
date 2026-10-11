@@ -19,6 +19,21 @@ describe("cron descriptions", () => {
     expect(description).toContain("09:00");
     expect(description).toContain("Monday through Friday");
   });
+  test("describes every supported macro", () => {
+    const expectedDescriptions = [
+      ["@yearly", "Runs at 00:00, on day 1 of the month, in January, in local time."],
+      ["@annually", "Runs at 00:00, on day 1 of the month, in January, in local time."],
+      ["@monthly", "Runs at 00:00, on day 1 of the month, in local time."],
+      ["@weekly", "Runs at 00:00, on Sunday, in local time."],
+      ["@daily", "Runs at 00:00, in local time."],
+      ["@midnight", "Runs at 00:00, in local time."],
+      ["@hourly", "Runs at minute 0 of every hour, in local time."],
+    ] as const;
+
+    for (const [macro, expected] of expectedDescriptions) {
+      expect(descriptionFor(macro)).toBe(expected);
+    }
+  });
 });
 
 describe("cron presets", () => {

@@ -34,6 +34,7 @@ The field order is `minute hour day-of-month month day-of-week`:
 | `*/15 * * * *` | Every 15 minutes. |
 | `0 9 * * 1-5` | Monday through Friday at 09:00 local time. |
 | `0 0 1 * *` | At midnight on the first day of each month. |
+| `@daily` | Runs at 00:00, in local time. |
 | `*/15 9-17 * * 1-5` | "Runs every 15 minutes, during hours 09 through 17, on Monday through Friday, in local time." |
 
 ### Supported syntax
@@ -46,8 +47,13 @@ The field order is `minute hour day-of-month month day-of-week`:
 | `*/15`, `10-30/5`, `5/10` | Positive steps; `5/10` runs from 5 through the field maximum in steps of 10 |
 | `JAN`-`DEC`, `SUN`-`SAT` | Month and weekday names, case-insensitive |
 | `0` or `7` | Sunday |
+| `@yearly`, `@annually`, `@monthly`, `@weekly`, `@daily`, `@midnight`, `@hourly` | Standard schedule macros |
 
-Six- and seven-field expressions, macros such as `@daily`, and the special tokens `?`, `L`, `W` and `#` are not supported. When both day-of-month and day-of-week are restricted, either may match (Vixie cron semantics).
+The macros expand as follows: `@yearly` and `@annually` → `0 0 1 1 *`; `@monthly` → `0 0 1 * *`; `@weekly` → `0 0 * * 0`; `@daily` and `@midnight` → `0 0 * * *`; `@hourly` → `0 * * * *`.
+
+![cronsay showing the note for the @daily macro](docs/screenshot-macros.png)
+
+Six- and seven-field expressions, `@reboot` and other macros, and the special tokens `?`, `L`, `W` and `#` are not supported. When both day-of-month and day-of-week are restricted, either may match (Vixie cron semantics).
 
 Run times are strictly after the current time and use your browser's time zone. Nonexistent times in daylight-saving gaps are skipped. The search is bounded to about eight years, so a valid schedule that never matches, such as `0 0 31 2 *`, shows a no-upcoming-runs message. Check the time zone and cron dialect of your real scheduler before relying on a schedule.
 

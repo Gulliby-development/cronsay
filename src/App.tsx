@@ -34,9 +34,14 @@ export function App({ initialExpression = "*/15 * * * *" }: AppProps = {}) {
         autoComplete="off"
         spellCheck={false}
       />
+      {result.ok && result.macro && result.expansion && (
+        <p id="macro-note" className="hint">
+          {`${result.macro} means ${result.expansion}`}
+        </p>
+      )}
       <p id="cron-hint" className="hint">
-        Five fields: minute, hour, day of month, month, day of week. For example: */15 * * * * or 0
-        9 * * MON-FRI.
+        Five fields: minute, hour, day of month, month, day of week. For example: */15 * * * *, 0 9
+        * * MON-FRI, or @daily.
       </p>
 
       <section aria-labelledby="presets-heading">
