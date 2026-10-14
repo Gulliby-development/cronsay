@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { analyze } from "./analyze";
+import { describeGaps } from "./cron/gaps";
 import { presets } from "./cron/presets";
 
 export interface AppProps {
@@ -9,6 +10,7 @@ export interface AppProps {
 export function App({ initialExpression = "*/15 * * * *" }: AppProps = {}) {
   const [expression, setExpression] = useState(initialExpression);
   const result = analyze(expression);
+  const gaps = result.ok ? describeGaps(result.runs) : null;
   const formatter = new Intl.DateTimeFormat(undefined, {
     year: "numeric",
     month: "short",
@@ -80,6 +82,11 @@ export function App({ initialExpression = "*/15 * * * *" }: AppProps = {}) {
                   </li>
                 ))}
               </ol>
+            )}
+            {gaps && (
+              <p id="gaps" className="hint">
+                {gaps}
+              </p>
             )}
           </section>
         )}

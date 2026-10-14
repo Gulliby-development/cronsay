@@ -37,6 +37,14 @@ The field order is `minute hour day-of-month month day-of-week`:
 | `@daily` | Runs at 00:00, in local time. |
 | `*/15 9-17 * * 1-5` | "Runs every 15 minutes, during hours 09 through 17, on Monday through Friday, in local time." |
 
+Under the list of runs, a line says how far apart the listed runs are: `*/15 * * * *` shows `Runs are 15 minutes apart.` and `0 9 * * 1-5` shows:
+
+```text
+Gaps between runs: shortest 1 day, longest 3 days.
+```
+
+The line is based on the runs that are listed, and gaps are elapsed time, so a daylight-saving change in your time zone can make a gap one hour longer or shorter (`longest 31 days 1 hour`). It is not shown when fewer than two runs are listed.
+
 ### Supported syntax
 
 | Form | Meaning |

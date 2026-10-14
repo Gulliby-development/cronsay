@@ -4,6 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { analyze } from "./analyze";
 import { presets } from "./cron/presets";
 
+const realAnalyze = analyze;
+let analyzeOverride: ReturnType<typeof analyze> | undefined;
+
 // Preserve React's element/renderer exports; only the component's state hook is stubbed.
 // Handlers update this cell, and calling App again simulates the next render.
 const realReact = { ...React };
@@ -22,11 +25,15 @@ function useState<T>(initial: T | (() => T)): [T, React.Dispatch<React.SetStateA
   ];
 }
 mock.module("react", () => ({ ...realReact, useState }));
+mock.module("./analyze", () => ({
+  analyze: (expression: string) => analyzeOverride ?? realAnalyze(expression),
+}));
 const { App } = await import("./App");
 
 beforeEach(() => {
   initialized = false;
   state = undefined;
+  analyzeOverride = undefined;
 });
 afterAll(() => {
   mock.module("react", () => realReact);
@@ -61,7 +68,7 @@ function typeExpression(tree: React.ReactNode, expression: string): ReturnType<t
 function expectResults(tree: ReturnType<typeof App>, expression: string): void {
   expect(input(tree).props.value).toBe(expression);
   expect(elements(tree).filter((element) => element.props.role === "alert")).toHaveLength(0);
-  const analysis = analyze(expression, new Date(2024, 0, 1));
+  const analysis = realAnalyze(expression, new Date(2024, 0, 1));
   expect(analysis.ok).toBe(true);
   if (!analysis.ok) throw new Error(analysis.error);
   expect(analysis.runs).toHaveLength(10);
@@ -108,6 +115,38 @@ describe("App rendered interactions", () => {
     expect(description.props.children).toContain("Monday through Friday");
   });
 
+  test("shows a timezone-agnostic gap summary for valid upcoming runs", () => {
+    const tree = App({ initialExpression: "*/5 * * * *" });
+    const summary = find(tree, (element) => element.props.id === "gaps");
+    expect(summary.type).toBe("p");
+    expect(summary.props.className).toBe("hint");
+    expect(String(summary.props.children)).toMatch(
+      /^(Runs are .+ apart\.|Gaps between runs: .+\.)$/,
+    );
+    const section = find(
+      tree,
+      (element) => element.props["aria-labelledby"] === "description-heading",
+    );
+    const sectionChildren = section.props.children as React.ReactNode[];
+    const listPosition = sectionChildren.findIndex(
+      (child) => React.isValidElement(child) && child.type === "ol",
+    );
+    expect(listPosition).toBeGreaterThanOrEqual(0);
+    expect(sectionChildren[listPosition + 1]).toBe(summary);
+  });
+
+  test("does not show a gap summary for a valid one-run result", () => {
+    const result = realAnalyze("*/5 * * * *");
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error);
+    analyzeOverride = { ...result, runs: result.runs.slice(0, 1) };
+    expect(analyzeOverride.runs).toHaveLength(1);
+
+    const tree = App({ initialExpression: "*/5 * * * *" });
+    expect(input(tree).props["aria-invalid"]).toBe(false);
+    expect(elements(tree).filter((element) => element.props.id === "gaps")).toHaveLength(0);
+  });
+
   test("typing invalid input removes stale results; typing valid input restores new results", () => {
     let tree = App({ initialExpression: "0 9 * * 1-5" });
     expectResults(tree, "0 9 * * 1-5");
@@ -118,6 +157,7 @@ describe("App rendered interactions", () => {
     const alert = find(tree, (element) => element.props.role === "alert");
     expect(String(alert.props.children).toLowerCase()).toContain("minute");
     expect(elements(tree).filter((element) => element.props.id === "description")).toHaveLength(0);
+    expect(elements(tree).filter((element) => element.props.id === "gaps")).toHaveLength(0);
     expect(elements(tree).filter((element) => element.type === "ol")).toHaveLength(0);
     expect(elements(tree).filter((element) => element.type === "time")).toHaveLength(0);
     const invalidMarkup = renderToStaticMarkup(tree);
@@ -175,7 +215,7 @@ describe("App rendered interactions", () => {
     expect(input(tree).props.value).toBe("0 0 31 2 *");
     expect(input(tree).props["aria-invalid"]).toBe(false);
     expect(elements(tree).filter((element) => element.props.role === "alert")).toHaveLength(0);
-    const analysis = analyze("0 0 31 2 *", new Date(2024, 0, 1));
+    const analysis = realAnalyze("0 0 31 2 *", new Date(2024, 0, 1));
     expect(analysis.ok).toBe(true);
     if (!analysis.ok) throw new Error(analysis.error);
     expect(analysis.runs).toEqual([]);
@@ -184,6 +224,7 @@ describe("App rendered interactions", () => {
     );
     expect(elements(tree).filter((element) => element.type === "ol")).toHaveLength(0);
     expect(elements(tree).filter((element) => element.type === "time")).toHaveLength(0);
+    expect(elements(tree).filter((element) => element.props.id === "gaps")).toHaveLength(0);
     const markup = renderToStaticMarkup(tree);
     expect(markup).toContain('id="description"');
     expect(markup).toContain("No upcoming runs");
@@ -225,7 +266,7 @@ describe("cron dependency boundaries", () => {
   });
 
   test("all cron modules are independent of React and the DOM", async () => {
-    for (const name of ["parse", "next", "describe", "presets"]) {
+    for (const name of ["parse", "next", "describe", "presets", "gaps"]) {
       const source = await Bun.file(new URL(`./cron/${name}.ts`, import.meta.url)).text();
       const imports = [...source.matchAll(/^\s*import\s+(?:.*?\s+from\s+)?["']([^"']+)["']/gm)];
       for (const entry of imports) {
@@ -235,5 +276,26 @@ describe("cron dependency boundaries", () => {
       expect(source).not.toMatch(/\b(?:document|window|HTMLElement)\b/);
       expect(source).not.toMatch(/["']react(?:-dom)?(?:\/[^"']*)?["']/);
     }
+  });
+
+  test("documents the gap summary directly before Supported syntax", async () => {
+    const readme = (await Bun.file(new URL("../README.md", import.meta.url)).text()).replace(
+      /\r\n/g,
+      "\n",
+    );
+    const wording = [
+      "Under the list of runs, a line says how far apart the listed runs are: " +
+        "`*/15 * * * *` shows `Runs are 15 minutes apart.` and " +
+        "`0 9 * * 1-5` shows:",
+      "",
+      "```text",
+      "Gaps between runs: shortest 1 day, longest 3 days.",
+      "```",
+      "",
+      "The line is based on the runs that are listed, and gaps are elapsed time, so a daylight-saving " +
+        "change in your time zone can make a gap one hour longer or shorter " +
+        "(`longest 31 days 1 hour`). It is not shown when fewer than two runs are listed.",
+    ].join("\n");
+    expect(readme).toContain(`${wording}\n\n### Supported syntax`);
   });
 });
