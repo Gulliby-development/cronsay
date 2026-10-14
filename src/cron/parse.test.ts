@@ -185,7 +185,7 @@ describe("parseCron invalid expressions", () => {
     "",
     "   ",
     "* * * *",
-    "* * * * * *",
+    "* * * * * * * *",
     "* * * * * * *",
     "@reboot",
     "@foo",

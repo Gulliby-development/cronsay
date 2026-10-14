@@ -61,7 +61,7 @@ The macros expand as follows: `@yearly` and `@annually` → `0 0 1 1 *`; `@month
 
 ![cronsay showing the note for the @daily macro](docs/screenshot-macros.png)
 
-Six- and seven-field expressions, `@reboot` and other macros, and the special tokens `?`, `L`, `W` and `#` are not supported. When both day-of-month and day-of-week are restricted, either may match (Vixie cron semantics).
+Six- and seven-field expressions, `@reboot` and other macros, and the special tokens `?`, `L`, `W` and `#` are not supported. A six-field expression such as `0 0 9 * * *` is rejected with a hint instead of the generic message: `field count: got 6 fields, expected 5; a leading seconds field is not supported, so remove it (minute hour day-of-month month day-of-week)`. When both day-of-month and day-of-week are restricted, either may match (Vixie cron semantics).
 
 Run times are strictly after the current time and use your browser's time zone. Nonexistent times in daylight-saving gaps are skipped. The search is bounded to about eight years, so a valid schedule that never matches, such as `0 0 31 2 *`, shows a no-upcoming-runs message. Check the time zone and cron dialect of your real scheduler before relying on a schedule.
 

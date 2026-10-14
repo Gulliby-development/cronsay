@@ -127,6 +127,8 @@ const macroExpansions: Readonly<Record<string, string>> = {
 
 const fieldCountError =
   "field count: expected five fields (minute hour day-of-month month day-of-week) or one macro (@yearly, @annually, @monthly, @weekly, @daily, @midnight, @hourly); other @-macros such as @reboot are unsupported";
+const sixFieldError =
+  "field count: got 6 fields, expected 5; a leading seconds field is not supported, so remove it (minute hour day-of-month month day-of-week)";
 
 /** Parse standard five-field cron and supported macros. Invalid strings return an error, never throw. */
 export function parseCron(expression: string): ParseResult {
@@ -141,6 +143,9 @@ export function parseCron(expression: string): ParseResult {
     const parsed = parseCron(expansion);
     if (!parsed.ok) return parsed;
     return { ok: true, fields: { ...parsed.fields, macro } };
+  }
+  if (tokens.length === 6 && !tokens[0].startsWith("@")) {
+    return { ok: false, field: "field count", error: sixFieldError };
   }
   if (tokens.length !== 5 || tokens[0].startsWith("@")) {
     return { ok: false, field: "field count", error: fieldCountError };
